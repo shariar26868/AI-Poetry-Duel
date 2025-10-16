@@ -1,6 +1,17 @@
+import os
+import sys
+
+# Critical: Set BEFORE importing streamlit
+os.environ['STREAMLIT_HOME'] = '/tmp/.streamlit'
+try:
+    os.makedirs('/tmp/.streamlit', exist_ok=True)
+except Exception as e:
+    print(f"Note: {e}")
+    pass
+
+# Now safe to import
 import streamlit as st
 from openai import OpenAI
-import os
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv  
