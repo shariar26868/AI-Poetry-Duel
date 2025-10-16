@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  poetry-duel:
+    build: .
+    container_name: ai-poetry-duel
+    ports:
+      - "8501:8501"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    env_file:
+      - .env
+    volumes:
+      # Mount code for development (optional - remove for production)
+      - ./app.py:/app/app.py
+      - ./core:/app/core
+      - ./utils:/app/utils
+      - ./config:/app/config
+    restart: unless-stopped
+    networks:
+      - poetry-network
+
+networks:
+  poetry-network:
+    driver: bridge
