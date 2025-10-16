@@ -163,27 +163,236 @@ def generate_poetry_duel(api_key, document_text, num_verses):
             st.error("Invalid API key. Please check your OPENAI_API_KEY in .env file")
 
 
+# def generate_poem_html(poem_lines):
+#     """Generate HTML for displaying the poem"""
+#     html = "<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 15px;'>"
+#     html += "<h2 style='color: white; text-align: center; margin-bottom: 20px;'>The Collaborative Poem</h2>"
+    
+#     for i, verse in enumerate(poem_lines):
+#         poet_config = POET_PERSONAS["romantic"] if verse['poet'] == "Aurora" else POET_PERSONAS["modernist"]
+        
+#         html += f"""
+#         <div style='margin: 15px 0; padding: 15px; background: rgba(255,255,255,0.1); border-left: 4px solid {poet_config['color']}; border-radius: 8px;'>
+#             <p style='color: white; font-size: 18px; font-style: italic; margin: 0;'>{verse['line']}</p>
+#             <p style='color: rgba(255,255,255,0.7); font-size: 12px; margin-top: 8px;'>
+#                 — {poet_config['icon']} {verse['poet']} 
+#                 <span style='font-style: italic;'>({verse['source'][:60]}...)</span>
+#             </p>
+#         </div>
+#         """
+    
+#     html += "</div>"
+#     return html
+
+
 def generate_poem_html(poem_lines):
-    """Generate HTML for displaying the poem"""
-    html = "<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 15px;'>"
-    html += "<h2 style='color: white; text-align: center; margin-bottom: 20px;'>The Collaborative Poem</h2>"
+    """Generate beautiful HTML for displaying the poem"""
+    
+    # Modern, elegant design with better typography and spacing
+    html = """
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap');
+        
+        .poem-container {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-radius: 20px;
+            padding: 50px 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .poem-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+        }
+        
+        .poem-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 42px;
+            font-weight: 600;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .poem-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 300;
+            color: #b8c1ec;
+            text-align: center;
+            margin-bottom: 40px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        .verse-container {
+            margin: 25px 0;
+            padding: 25px 30px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .verse-container:hover {
+            background: rgba(255, 255, 255, 0.06);
+            transform: translateX(5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .verse-romantic {
+            border-left-color: #ff6b9d;
+            background: linear-gradient(90deg, rgba(255, 107, 157, 0.05) 0%, rgba(255, 255, 255, 0.03) 100%);
+        }
+        
+        .verse-modernist {
+            border-left-color: #4169e1;
+            background: linear-gradient(90deg, rgba(65, 105, 225, 0.05) 0%, rgba(255, 255, 255, 0.03) 100%);
+        }
+        
+        .verse-number {
+            position: absolute;
+            left: -15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+        }
+        
+        .verse-line {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            font-style: italic;
+            color: #ffffff;
+            line-height: 1.6;
+            margin: 0 0 12px 0;
+            padding-left: 20px;
+        }
+        
+        .verse-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .poet-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            color: #e0e7ff;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+        }
+        
+        .poet-icon {
+            font-size: 16px;
+        }
+        
+        .source-tag {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            color: #94a3b8;
+            font-style: italic;
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .poem-footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        
+        @media (max-width: 768px) {
+            .poem-container {
+                padding: 30px 20px;
+            }
+            
+            .poem-title {
+                font-size: 32px;
+            }
+            
+            .verse-line {
+                font-size: 18px;
+            }
+            
+            .verse-meta {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+    
+    <div class="poem-container">
+        <h2 class="poem-title">The Collaborative Poem</h2>
+        <div class="poem-subtitle">A Duel of Words & Wisdom</div>
+    """
     
     for i, verse in enumerate(poem_lines):
         poet_config = POET_PERSONAS["romantic"] if verse['poet'] == "Aurora" else POET_PERSONAS["modernist"]
+        poet_class = "verse-romantic" if verse['poet'] == "Aurora" else "verse-modernist"
         
         html += f"""
-        <div style='margin: 15px 0; padding: 15px; background: rgba(255,255,255,0.1); border-left: 4px solid {poet_config['color']}; border-radius: 8px;'>
-            <p style='color: white; font-size: 18px; font-style: italic; margin: 0;'>{verse['line']}</p>
-            <p style='color: rgba(255,255,255,0.7); font-size: 12px; margin-top: 8px;'>
-                — {poet_config['icon']} {verse['poet']} 
-                <span style='font-style: italic;'>({verse['source'][:60]}...)</span>
-            </p>
+        <div class="verse-container {poet_class}">
+            <div class="verse-number">{i+1}</div>
+            <p class="verse-line">"{verse['line']}"</p>
+            <div class="verse-meta">
+                <div class="poet-badge">
+                    <span class="poet-icon">{poet_config['icon']}</span>
+                    <span>{verse['poet']}</span>
+                </div>
+                <div class="source-tag">
+                    Source: {verse['source'][:80]}{'...' if len(verse['source']) > 80 else ''}
+                </div>
+            </div>
         </div>
         """
     
-    html += "</div>"
+    html += """
+        <div class="poem-footer">
+            ✨ Created by AI Poets · Judged by AI Critic ✨
+        </div>
+    </div>
+    """
+    
     return html
-
 
 def display_judgment_details():
     """Display detailed judgment information"""
