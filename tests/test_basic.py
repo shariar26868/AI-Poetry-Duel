@@ -2,16 +2,11 @@ import unittest
 from unittest.mock import Mock, MagicMock, patch
 import sys
 import os
-
-# Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from core.poet import AIPoet
 from core.judge import PoetryJudge
 from core.document_processor import DocumentProcessor
 from config.settings import POET_PERSONAS, JUDGING_CRITERIA
-
-
 class TestDocumentProcessor(unittest.TestCase):
     """Test document text extraction"""
     
@@ -28,8 +23,6 @@ class TestDocumentProcessor(unittest.TestCase):
     
     def test_pdf_extraction_structure(self):
         """Test PDF extraction logic structure"""
-        # This would require actual PDF file in real test
-        # Here we just verify the method exists and has correct signature
         self.assertTrue(hasattr(DocumentProcessor, '_extract_from_pdf'))
     
     def test_docx_extraction_structure(self):
@@ -73,8 +66,6 @@ SOURCE: Document mentions stellar observations"""
         response_text = "Random text without proper format"
         
         result = self.poet._parse_verse_response(response_text)
-        
-        # Should still return dict with keys, even if empty
         self.assertIn('line', result)
         self.assertIn('source', result)
 
@@ -102,9 +93,6 @@ class TestJudge(unittest.TestCase):
         }
         
         result = self.judge._calculate_weighted_score(scores)
-        
-        # Manual calculation:
-        # 8*0.25 + 7*0.20 + 9*0.20 + 6*0.20 + 8*0.15 = 7.6
         expected = 8*0.25 + 7*0.20 + 9*0.20 + 6*0.20 + 8*0.15
         
         self.assertAlmostEqual(result, expected, places=2)
@@ -143,11 +131,8 @@ class TestJudge(unittest.TestCase):
         invalid_response = "This is not JSON at all"
         
         result = self.judge._parse_judgment(invalid_response)
-        
-        # Should return fallback dict
         self.assertIn('verse_a_scores', result)
         self.assertIn('verse_b_scores', result)
-        # Fallback scores should be 5
         self.assertEqual(result['verse_a_scores']['factual_grounding'], 5)
     
     def test_final_statistics_empty(self):
@@ -157,21 +142,20 @@ class TestJudge(unittest.TestCase):
     
     def test_final_statistics_calculation(self):
         """Test statistics calculation with sample judgments"""
-        # Add mock judgments with BOTH poet names
         self.judge.judgments = [
             {
                 'winner': 'Aurora',
                 'verse_a_total': 8.0,
                 'verse_b_total': 7.5,
                 'poet_a_name': 'Aurora',
-                'poet_b_name': 'Echo'  # This was missing!
+                'poet_b_name': 'Echo' 
             },
             {
                 'winner': 'Echo',
                 'verse_a_total': 7.0,
                 'verse_b_total': 8.5,
                 'poet_a_name': 'Aurora',
-                'poet_b_name': 'Echo'  # This was missing!
+                'poet_b_name': 'Echo'  
             }
         ]
         
@@ -179,9 +163,8 @@ class TestJudge(unittest.TestCase):
         
         self.assertEqual(stats['poet_a_wins'], 1)
         self.assertEqual(stats['poet_b_wins'], 1)
-        self.assertEqual(stats['poet_a_avg_score'], 7.5)  # (8.0 + 7.0) / 2
-        self.assertEqual(stats['poet_b_avg_score'], 8.0)  # (7.5 + 8.5) / 2
-
+        self.assertEqual(stats['poet_a_avg_score'], 7.5)  
+        self.assertEqual(stats['poet_b_avg_score'], 8.0)  
 
 class TestConfiguration(unittest.TestCase):
     """Test configuration settings"""

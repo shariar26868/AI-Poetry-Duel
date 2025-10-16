@@ -1,8 +1,6 @@
-import anthropic
+from openai import OpenAI  
 from config.settings import MODEL_NAME, MAX_TOKENS, TEMPERATURE
 from utils.prompts import get_poet_system_prompt, get_poet_user_prompt
-
-
 class AIPoet:
     """
     Represents an AI poet with a specific persona and style
@@ -26,23 +24,19 @@ class AIPoet:
         """
         system_prompt = get_poet_system_prompt(self.name, self.config)
         user_prompt = get_poet_user_prompt(document_text, previous_lines, line_number)
-        
-        response = self.client.messages.create(
+        response = self.client.chat.completions.create(
             model=MODEL_NAME,
             max_tokens=MAX_TOKENS,
             temperature=TEMPERATURE,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}]
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
         )
-        
-        content = response.content[0].text
-        
-        # Parse response
+        content = response.choices[0].message.content
         verse_data = self._parse_verse_response(content)
-        self.verses_created.append(verse_data)
-        
-        return verse_data
-    
+        self.verses_created.append(verse_data)      
+        return verse_data  
     def _parse_verse_response(self, response_text):
         """Parse the poet's response into structured data"""
         lines = response_text.strip().split('\n')

@@ -1,9 +1,6 @@
-# Model configuration
-MODEL_NAME = "claude-sonnet-4-20250514"
+MODEL_NAME = "gpt-4o"  
 MAX_TOKENS = 2000
 TEMPERATURE = 0.7
-
-# Poet personas configuration
 POET_PERSONAS = {
     "romantic": {
         "name": "Aurora",
@@ -11,7 +8,7 @@ POET_PERSONAS = {
         "style": "Focuses on emotion, nature metaphors, flowing rhythm, and sensory imagery",
         "approach": "Seeks beauty and emotional truth in facts",
         "color": "#ff69b4",
-        "icon": "🌸"
+        "icon": ""
     },
     "modernist": {
         "name": "Echo",
@@ -19,10 +16,9 @@ POET_PERSONAS = {
         "style": "Sharp imagery, fragmented thoughts, unexpected juxtapositions, contemporary language",
         "approach": "Finds stark truth and irony in factual details",
         "color": "#4169e1",
-        "icon": "⚡"
+        "icon": ""
     }
 }
-
 # Judging criteria weights
 JUDGING_CRITERIA = {
     "factual_grounding": {
@@ -46,8 +42,6 @@ JUDGING_CRITERIA = {
         "description": "Ability to evoke feeling or insight"
     }
 }
-
-# Poem configuration
 MIN_VERSES = 6
 MAX_VERSES = 12
 DEFAULT_VERSES = 8

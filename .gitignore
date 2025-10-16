@@ -1,0 +1,4 @@
+bash# .gitignore
+.env
+__pycache__/
+*.pyc

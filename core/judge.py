@@ -1,9 +1,7 @@
-import anthropic
+from openai import OpenAI  
 import json
 from config.settings import MODEL_NAME, MAX_TOKENS, JUDGING_CRITERIA
 from utils.prompts import get_judge_system_prompt, get_judge_user_prompt
-
-
 class PoetryJudge:
     """
     AI Judge that evaluates verses using a multi-dimensional rubric
@@ -34,42 +32,29 @@ class PoetryJudge:
             poet_a_name, 
             poet_b_name
         )
-        
-        response = self.client.messages.create(
+        response = self.client.chat.completions.create(
             model=MODEL_NAME,
             max_tokens=MAX_TOKENS,
-            temperature=0.3,  # Lower temperature for more consistent judging
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}]
+            temperature=0.3,  
+            response_format={"type": "json_object"},  
+            messages=[
+                {"role": "system", "content": system_prompt + "\n\nIMPORTANT: You must respond with valid JSON only."},
+                {"role": "user", "content": user_prompt}
+            ]
         )
-        
-        content = response.content[0].text
-        
-        # Parse JSON response
+        content = response.choices[0].message.content
         judgment = self._parse_judgment(content)
-        
-        # Calculate weighted scores
         judgment['verse_a_total'] = self._calculate_weighted_score(judgment['verse_a_scores'])
         judgment['verse_b_total'] = self._calculate_weighted_score(judgment['verse_b_scores'])
-        
-        # Store poet names for statistics
         judgment['poet_a_name'] = poet_a_name
-        judgment['poet_b_name'] = poet_b_name
-        
-        self.judgments.append(judgment)
-        
-        return judgment
-    
+        judgment['poet_b_name'] = poet_b_name        
+        self.judgments.append(judgment)     
+        return judgment  
     def _parse_judgment(self, response_text):
         """Parse judge's JSON response"""
         try:
-            # Extract JSON from response
-            start = response_text.find('{')
-            end = response_text.rfind('}') + 1
-            json_str = response_text[start:end]
-            return json.loads(json_str)
+            return json.loads(response_text)
         except json.JSONDecodeError:
-            # Fallback if JSON parsing fails
             return {
                 "verse_a_scores": {k: 5 for k in self.criteria.keys()},
                 "verse_b_scores": {k: 5 for k in self.criteria.keys()},
@@ -91,11 +76,8 @@ class PoetryJudge:
         """Calculate final statistics across all judgments"""
         if not self.judgments:
             return None
-        
-        # Count wins for each poet
         poet_a_wins = 0
-        poet_b_wins = 0
-        
+        poet_b_wins = 0   
         for judgment in self.judgments:
             poet_a_name = judgment.get('poet_a_name')
             poet_b_name = judgment.get('poet_b_name')
@@ -105,8 +87,6 @@ class PoetryJudge:
                 poet_a_wins += 1
             elif winner == poet_b_name:
                 poet_b_wins += 1
-        
-        # Calculate average scores
         poet_a_avg = sum(j['verse_a_total'] for j in self.judgments) / len(self.judgments)
         poet_b_avg = sum(j['verse_b_total'] for j in self.judgments) / len(self.judgments)
         

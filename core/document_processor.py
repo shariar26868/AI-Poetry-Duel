@@ -1,11 +1,8 @@
-
 import PyPDF2
 import io
 from docx import Document
 from PIL import Image
 import pytesseract
-
-
 class DocumentProcessor:
     """Handles extraction of text from various document formats"""
     
