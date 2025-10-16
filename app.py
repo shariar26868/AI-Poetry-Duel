@@ -187,8 +187,6 @@ def generate_poetry_duel(api_key, document_text, num_verses):
 
 def generate_poem_html(poem_lines):
     """Generate beautiful HTML for displaying the poem"""
-    
-    # Modern, elegant design with better typography and spacing
     html = """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap');
