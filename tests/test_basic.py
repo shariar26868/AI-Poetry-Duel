@@ -7,6 +7,7 @@ from core.poet import AIPoet
 from core.judge import PoetryJudge
 from core.document_processor import DocumentProcessor
 from config.settings import POET_PERSONAS, JUDGING_CRITERIA
+
 class TestDocumentProcessor(unittest.TestCase):
     """Test document text extraction"""
     
@@ -32,7 +33,6 @@ class TestDocumentProcessor(unittest.TestCase):
     def test_image_extraction_structure(self):
         """Test image OCR extraction structure"""
         self.assertTrue(hasattr(DocumentProcessor, '_extract_from_image'))
-
 
 class TestPoet(unittest.TestCase):
     """Test AI Poet functionality"""
@@ -68,7 +68,6 @@ SOURCE: Document mentions stellar observations"""
         result = self.poet._parse_verse_response(response_text)
         self.assertIn('line', result)
         self.assertIn('source', result)
-
 
 class TestJudge(unittest.TestCase):
     """Test Poetry Judge functionality"""
@@ -192,7 +191,11 @@ class TestConfiguration(unittest.TestCase):
         total_weight = sum(details['weight'] for details in JUDGING_CRITERIA.values())
         self.assertAlmostEqual(total_weight, 1.0, places=2,
             msg="Judging criteria weights should sum to 1.0")
-
+    
+    def test_poet_personas_count(self):
+        """Test that the correct number of poet personas are defined"""
+        self.assertEqual(len(POET_PERSONAS), 6, 
+                         f"Expected 6 poet personas, but found {len(POET_PERSONAS)}")
 
 if __name__ == '__main__':
     unittest.main()

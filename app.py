@@ -1,483 +1,335 @@
 import os
-import sys
-
-# Critical: Set BEFORE importing streamlit
-os.environ['STREAMLIT_HOME'] = '/tmp/.streamlit'
-try:
-    os.makedirs('/tmp/.streamlit', exist_ok=True)
-except Exception as e:
-    print(f"Note: {e}")
-    pass
-
-# Now safe to import
-import streamlit as st
-from openai import OpenAI
+import gradio as gr
 from pathlib import Path
-from datetime import datetime
-from dotenv import load_dotenv  
+from dotenv import load_dotenv
+from openai import OpenAI
 from core.poet import AIPoet
 from core.judge import PoetryJudge
 from core.document_processor import DocumentProcessor
 from core.audio_generator import AudioGenerator
-from config.settings import POET_PERSONAS, JUDGING_CRITERIA, DEFAULT_VERSES
-from utils.scoring import display_score_breakdown
-load_dotenv()
-if 'poem_lines' not in st.session_state:
-    st.session_state.poem_lines = []
-if 'judgments' not in st.session_state:
-    st.session_state.judgments = []
-if 'document_text' not in st.session_state:
-    st.session_state.document_text = None
+from config.settings import POET_PERSONAS, JUDGING_CRITERIA, DEFAULT_VERSES, MIN_VERSES, MAX_VERSES
 
-def main():
-    st.title("🎭 AI Poetry Duel")
-    st.markdown("### Where Two AI Poets Compete, and One Judge Decides")
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        st.error("OpenAI API Key not found!")
-        st.info("""
-        **How to set up your API key:**
-        1. Create a `.env` file in your project root
-        2. Add this line: `OPENAI_API_KEY=your_api_key_here`
-        3. Or set environment variable: `export OPENAI_API_KEY='your_key'`
-        
-        Get your API key from: https://platform.openai.com/api-keys
-        """)
-        st.stop()
-    st.sidebar.success(f"API Key loaded: ...{api_key[-8:]}")
-    with st.sidebar:
-        st.header("⚙️ Configuration")  
-        st.divider() 
-        num_verses = st.slider("Number of verses", 1, 12, DEFAULT_VERSES)
-        st.divider()
-        st.subheader("Meet the Poets")
-        for persona_key, persona in POET_PERSONAS.items():
-            st.markdown(f"**{persona['icon']} {persona['full_title']}**")
-            st.caption(persona['style'])
-            st.markdown("")
-        st.divider()
-        st.subheader("Judging Criteria")
-        for criterion, details in JUDGING_CRITERIA.items():
-            st.markdown(f"**{criterion.replace('_', ' ').title()}** ({details['weight']*100}%)")
-            st.caption(details['description'])
-    tab1, tab2, tab3 = st.tabs(["Upload & Generate", "Judgment Details", "Audio (Bonus)"])
+# Load environment variables
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Get API key
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    raise ValueError("OPENAI_API_KEY not found. Please set it in .env file")
+
+# Initialize OpenAI client
+client = OpenAI(api_key=api_key)
+
+def process_document(file):
+    """Process uploaded document and extract text"""
+    if file is None:
+        return "❌ Please upload a document first!", gr.update(interactive=False)
     
-    with tab1:
-        st.header("Upload Your Document")
-        uploaded_file = st.file_uploader(
-            "Choose a file (PDF, DOCX, TXT, or Image)",
-            type=['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg']
-        )
-        
-        if uploaded_file:
-            with st.spinner("Extracting text from document..."):
-                try:
-                    document_text = DocumentProcessor.extract_text(uploaded_file)
-                    st.session_state.document_text = document_text
-                    
-                    st.success(f"Extracted {len(document_text)} characters")
-                    
-                    with st.expander("Preview document content"):
-                        st.text(document_text[:500] + "...")
-                except Exception as e:
-                    st.error(f"Error extracting text: {str(e)}")
-        
-        if st.session_state.document_text and st.button("🎭 Start Poetry Duel", type="primary"):
-            generate_poetry_duel(api_key, st.session_state.document_text, num_verses)
-    
-    with tab2:
-        display_judgment_details()
-    
-    with tab3:
-        display_audio_section()
-def generate_poetry_duel(api_key, document_text, num_verses):
-    """Main function to orchestrate the poetry duel"""
     try:
-        client = OpenAI(api_key=api_key)
-        poet_romantic = AIPoet(client, "romantic", POET_PERSONAS["romantic"])
-        poet_modernist = AIPoet(client, "modernist", POET_PERSONAS["modernist"])
+        document_text = DocumentProcessor.extract_text(file)
+        
+        if not document_text or len(document_text.strip()) < 100:
+            return "❌ Could not extract sufficient text. Please upload a different file.", gr.update(interactive=False)
+        
+        text_preview = document_text[:500] + "..." if len(document_text) > 500 else document_text
+        return f"✅ Document processed successfully!\n\n**Preview:**\n{text_preview}", gr.update(interactive=True)
+    
+    except Exception as e:
+        return f"❌ Error processing document: {str(e)}", gr.update(interactive=False)
+
+def run_poetry_duel(file, persona_a, persona_b, num_verses, progress=gr.Progress()):
+    """Run the complete poetry duel automatically"""
+    
+    if file is None:
+        return "❌ Please upload a document first!", "", "", "", None
+    
+    if persona_a == persona_b:
+        return "❌ Please select two different poet personas!", "", "", "", None
+    
+    try:
+        progress(0, desc="Processing document...")
+        
+        # Extract text
+        document_text = DocumentProcessor.extract_text(file)
+        
+        if not document_text or len(document_text.strip()) < 100:
+            return "❌ Could not extract sufficient text from document.", "", "", "", None
+        
+        progress(0.05, desc="Initializing poets...")
+        
+        # Initialize poets
+        poet_a_config = POET_PERSONAS[persona_a]
+        poet_b_config = POET_PERSONAS[persona_b]
+        
+        poet_a = AIPoet(client, persona_a, poet_a_config)
+        poet_b = AIPoet(client, persona_b, poet_b_config)
         judge = PoetryJudge(client)
         
-        st.session_state.poem_lines = []
-        st.session_state.judgments = []
+        poem_lines = []
+        poet_names = []
         
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        # Intro
+        duel_info = f"""
+# 🎭 Poetry Duel Arena
+
+**{poet_a.name}** ({poet_a_config['icon']} {poet_a_config['full_title']}) 🆚 **{poet_b.name}** ({poet_b_config['icon']} {poet_b_config['full_title']})
+
+Total Rounds: {num_verses}
+
+---
+"""
         
-        poem_display = st.empty()
-        for i in range(num_verses):
-            current_poet = poet_romantic if i % 2 == 0 else poet_modernist
-            other_poet = poet_modernist if i % 2 == 0 else poet_romantic
+        all_rounds_display = ""
+        
+        # Run all rounds
+        for round_num in range(1, num_verses + 1):
+            progress(0.05 + (0.75 * round_num / num_verses), 
+                    desc=f"Round {round_num}/{num_verses}: Poets creating verses...")
             
-            status_text.text(f"{current_poet.name} is creating verse {i+1}...")
+            # Both poets create verses
+            verse_a_data = poet_a.create_verse(document_text, poem_lines, round_num)
+            verse_b_data = poet_b.create_verse(document_text, poem_lines, round_num)
             
-            try:
-                verse_current = current_poet.create_verse(
-                    document_text, 
-                    [line['line'] for line in st.session_state.poem_lines],
-                    i + 1
-                )
-                
-                verse_other = other_poet.create_verse(
-                    document_text,
-                    [line['line'] for line in st.session_state.poem_lines],
-                    i + 1
-                )
+            verse_a = verse_a_data['line']
+            verse_b = verse_b_data['line']
             
-                status_text.text(f"Judge is evaluating verses...")
-                
-                poem_context = "\n".join([f"Line {j+1}: {line['line']}" for j, line in enumerate(st.session_state.poem_lines)])
-                
-                judgment = judge.judge_verses(
-                    document_text,
-                    poem_context,
-                    f"{verse_current['line']}\nSOURCE: {verse_current['source']}",
-                    f"{verse_other['line']}\nSOURCE: {verse_other['source']}",
-                    current_poet.name,
-                    other_poet.name
-                )
-                
-                winning_verse = verse_current if judgment['winner'] == current_poet.name else verse_other
-                st.session_state.poem_lines.append(winning_verse)
-                st.session_state.judgments.append(judgment)
-                
-                poem_html = generate_poem_html(st.session_state.poem_lines)
-                poem_display.markdown(poem_html, unsafe_allow_html=True)
-                
-                progress_bar.progress((i + 1) / num_verses)
-                
-            except Exception as e:
-                error_message = str(e)
-                if "insufficient_quota" in error_message or "429" in error_message:
-                    st.error(f"**OpenAI API Quota Exceeded**")
-                    st.warning("""
-                    **Solutions:**
-                    1. Check your billing at: https://platform.openai.com/account/billing
-                    2. Add payment method and credits
-                    3. Wait for quota reset
-                    4. Use a different API key
-                    """)
-                    break  
+            progress(0.05 + (0.75 * (round_num - 0.5) / num_verses), 
+                    desc=f"Round {round_num}/{num_verses}: Judge evaluating...")
+            
+            # Judge evaluates
+            poem_context = "\n".join([f"Line {i+1}: {line}" for i, line in enumerate(poem_lines)])
+            judgment = judge.judge_verses(
+                document_text,
+                poem_context,
+                verse_a,
+                verse_b,
+                poet_a.name,
+                poet_b.name
+            )
+            
+            # Add winning verse to poem
+            if judgment['winner'] == poet_a.name:
+                poem_lines.append(verse_a)
+                poet_names.append(poet_a.name)
+            elif judgment['winner'] == poet_b.name:
+                poem_lines.append(verse_b)
+                poet_names.append(poet_b.name)
+            else:
+                # Tie - use higher score
+                if judgment['verse_a_total'] >= judgment['verse_b_total']:
+                    poem_lines.append(verse_a)
+                    poet_names.append(poet_a.name)
                 else:
-                    st.error(f"Error generating verse {i+1}: {error_message}")
-                    st.warning("Attempting to continue with next verse...")
-                    continue
-        if st.session_state.poem_lines:
-            status_text.text("Poetry duel complete!")
-            display_final_statistics(judge)
+                    poem_lines.append(verse_b)
+                    poet_names.append(poet_b.name)
+            
+            # Format round results
+            round_display = f"""
+## 🎯 Round {round_num}/{num_verses}
+
+### Verses:
+
+**{poet_a.name} {poet_a_config['icon']}:**
+> {verse_a}
+
+*Source: {verse_a_data['source']}*
+
+**{poet_b.name} {poet_b_config['icon']}:**
+> {verse_b}
+
+*Source: {verse_b_data['source']}*
+
+---
+
+### Judge's Evaluation:
+
+**Scores:**
+- {poet_a.name}: **{judgment['verse_a_total']}/10**
+- {poet_b.name}: **{judgment['verse_b_total']}/10**
+
+**Winner: {judgment['winner']}** 🏆
+
+<details>
+<summary><b>Detailed Score Breakdown</b></summary>
+
+**{poet_a.name}'s Scores:**
+"""
+            
+            for criterion, score in judgment['verse_a_scores'].items():
+                weight = JUDGING_CRITERIA[criterion]['weight']
+                round_display += f"- {criterion.replace('_', ' ').title()}: {score}/10 (weight: {weight})\n"
+            
+            round_display += f"\n**{poet_b.name}'s Scores:**\n"
+            
+            for criterion, score in judgment['verse_b_scores'].items():
+                weight = JUDGING_CRITERIA[criterion]['weight']
+                round_display += f"- {criterion.replace('_', ' ').title()}: {score}/10 (weight: {weight})\n"
+            
+            round_display += f"""
+**Judge's Reasoning:**
+
+*{poet_a.name}:* {judgment['verse_a_reasoning']}
+
+*{poet_b.name}:* {judgment['verse_b_reasoning']}
+
+**Final Verdict:** {judgment['final_verdict']}
+
+</details>
+
+---
+
+"""
+            
+            all_rounds_display += round_display
+        
+        progress(0.85, desc="Generating final poem...")
+        
+        # Final poem
+        poem_display = "# 📜 Final Collaborative Poem\n\n"
+        for i, (line, poet) in enumerate(zip(poem_lines, poet_names), 1):
+            poet_config = next((p for p in POET_PERSONAS.values() if p['name'] == poet), None)
+            icon = poet_config['icon'] if poet_config else "✍️"
+            poem_display += f"**{i}.** {line} *— {icon} {poet}*\n\n"
+        
+        progress(0.90, desc="Calculating statistics...")
+        
+        # Final statistics
+        stats = judge.get_final_statistics()
+        
+        stats_display = f"""
+# 📊 Final Statistics
+
+## 🏆 Round Victories
+- **{poet_a.name} {poet_a_config['icon']}:** {stats['poet_a_wins']} wins
+- **{poet_b.name} {poet_b_config['icon']}:** {stats['poet_b_wins']} wins
+
+## 📈 Average Scores
+- **{poet_a.name}:** {stats['poet_a_avg_score']}/10
+- **{poet_b.name}:** {stats['poet_b_avg_score']}/10
+
+"""
+        
+        if stats['poet_a_wins'] > stats['poet_b_wins']:
+            stats_display += f"### 👑 Overall Champion: {poet_a.name} {poet_a_config['icon']}!\n"
+        elif stats['poet_b_wins'] > stats['poet_a_wins']:
+            stats_display += f"### 👑 Overall Champion: {poet_b.name} {poet_b_config['icon']}!\n"
         else:
-            status_text.text("No verses were generated. Please check your API key and quota.")
-            
+            stats_display += "### 🤝 It's a Tie! Both poets performed equally well.\n"
+        
+        progress(0.95, desc="Generating audio...")
+        
+        # Generate audio
+        audio_path = None
+        try:
+            audio_buffer = AudioGenerator.generate_poem_audio(poem_lines, poet_names)
+            audio_path = "poem_audio.mp3"
+            with open(audio_path, "wb") as f:
+                f.write(audio_buffer.getvalue())
+        except Exception as e:
+            stats_display += f"\n\n⚠️ Audio generation failed: {str(e)}"
+        
+        progress(1.0, desc="Complete!")
+        
+        status = f"✅ Poetry duel completed! {num_verses} rounds finished successfully."
+        
+        return status, duel_info, all_rounds_display, poem_display, stats_display, audio_path
+        
     except Exception as e:
-        st.error(f"Fatal error: {str(e)}")
-        if "authentication" in str(e).lower() or "api key" in str(e).lower():
-            st.error("Invalid API key. Please check your OPENAI_API_KEY in .env file")
+        return f"❌ Error: {str(e)}", "", "", "", "", None
 
-
-# def generate_poem_html(poem_lines):
-#     """Generate HTML for displaying the poem"""
-#     html = "<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 15px;'>"
-#     html += "<h2 style='color: white; text-align: center; margin-bottom: 20px;'>The Collaborative Poem</h2>"
+# Create Gradio Interface
+with gr.Blocks(title="🎭 Poetry Duel Arena", theme=gr.themes.Soft()) as app:
     
-#     for i, verse in enumerate(poem_lines):
-#         poet_config = POET_PERSONAS["romantic"] if verse['poet'] == "Aurora" else POET_PERSONAS["modernist"]
-        
-#         html += f"""
-#         <div style='margin: 15px 0; padding: 15px; background: rgba(255,255,255,0.1); border-left: 4px solid {poet_config['color']}; border-radius: 8px;'>
-#             <p style='color: white; font-size: 18px; font-style: italic; margin: 0;'>{verse['line']}</p>
-#             <p style='color: rgba(255,255,255,0.7); font-size: 12px; margin-top: 8px;'>
-#                 — {poet_config['icon']} {verse['poet']} 
-#                 <span style='font-style: italic;'>({verse['source'][:60]}...)</span>
-#             </p>
-#         </div>
-#         """
+    gr.Markdown("""
+    # 🎭 Poetry Duel Arena
+    ### AI Poets Transform Documents into Collaborative Poetry
     
-#     html += "</div>"
-#     return html
-
-
-def generate_poem_html(poem_lines):
-    """Generate beautiful HTML for displaying the poem"""
-    html = """
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap');
-        
-        .poem-container {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            border-radius: 20px;
-            padding: 50px 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .poem-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
-        }
-        
-        .poem-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 42px;
-            font-weight: 600;
-            color: #ffffff;
-            text-align: center;
-            margin-bottom: 15px;
-            letter-spacing: 1px;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-        }
-        
-        .poem-subtitle {
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            font-weight: 300;
-            color: #b8c1ec;
-            text-align: center;
-            margin-bottom: 40px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-        
-        .verse-container {
-            margin: 25px 0;
-            padding: 25px 30px;
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            border-left: 4px solid;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-        
-        .verse-container:hover {
-            background: rgba(255, 255, 255, 0.06);
-            transform: translateX(5px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-        }
-        
-        .verse-romantic {
-            border-left-color: #ff6b9d;
-            background: linear-gradient(90deg, rgba(255, 107, 157, 0.05) 0%, rgba(255, 255, 255, 0.03) 100%);
-        }
-        
-        .verse-modernist {
-            border-left-color: #4169e1;
-            background: linear-gradient(90deg, rgba(65, 105, 225, 0.05) 0%, rgba(255, 255, 255, 0.03) 100%);
-        }
-        
-        .verse-number {
-            position: absolute;
-            left: -15px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 600;
-            color: white;
-            box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
-        }
-        
-        .verse-line {
-            font-family: 'Playfair Display', serif;
-            font-size: 22px;
-            font-style: italic;
-            color: #ffffff;
-            line-height: 1.6;
-            margin: 0 0 12px 0;
-            padding-left: 20px;
-        }
-        
-        .verse-meta {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        
-        .poet-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-family: 'Inter', sans-serif;
-            font-size: 13px;
-            font-weight: 500;
-            color: #e0e7ff;
-            padding: 6px 14px;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(5px);
-        }
-        
-        .poet-icon {
-            font-size: 16px;
-        }
-        
-        .source-tag {
-            font-family: 'Inter', sans-serif;
-            font-size: 11px;
-            color: #94a3b8;
-            font-style: italic;
-            max-width: 400px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .poem-footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 30px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            color: #94a3b8;
-        }
-        
-        @media (max-width: 768px) {
-            .poem-container {
-                padding: 30px 20px;
-            }
+    Two AI poets with distinct personas compete to create the best verses based on your document.
+    An AI judge evaluates each round, and the winning verses form a collaborative poem.
+    """)
+    
+    with gr.Row():
+        with gr.Column(scale=1):
+            gr.Markdown("### 📄 Step 1: Upload Document")
+            file_input = gr.File(
+                label="Upload PDF, DOCX, TXT, or Image",
+                file_types=[".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg"]
+            )
             
-            .poem-title {
-                font-size: 32px;
-            }
+            gr.Markdown("### 🎨 Step 2: Select Poets")
             
-            .verse-line {
-                font-size: 18px;
-            }
+            persona_a = gr.Dropdown(
+                choices=list(POET_PERSONAS.keys()),
+                value=list(POET_PERSONAS.keys())[0] if POET_PERSONAS else "romantic",
+                label="First Poet",
+                info="Select the first AI poet persona"
+            )
             
-            .verse-meta {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-        }
-    </style>
-    
-    <div class="poem-container">
-        <h2 class="poem-title">The Collaborative Poem</h2>
-        <div class="poem-subtitle">A Duel of Words & Wisdom</div>
-    """
-    
-    for i, verse in enumerate(poem_lines):
-        poet_config = POET_PERSONAS["romantic"] if verse['poet'] == "Aurora" else POET_PERSONAS["modernist"]
-        poet_class = "verse-romantic" if verse['poet'] == "Aurora" else "verse-modernist"
+            persona_b = gr.Dropdown(
+                choices=list(POET_PERSONAS.keys()),
+                value=list(POET_PERSONAS.keys())[1] if len(POET_PERSONAS) > 1 else list(POET_PERSONAS.keys())[0],
+                label="Second Poet",
+                info="Select the second AI poet persona"
+            )
+            
+            num_verses = gr.Slider(
+                minimum=MIN_VERSES,
+                maximum=MAX_VERSES,
+                value=DEFAULT_VERSES,
+                step=1,
+                label="Number of Verses",
+                info="How many rounds of competition?"
+            )
+            
+            gr.Markdown("### 🚀 Step 3: Start Duel")
+            start_btn = gr.Button("🎬 Start Poetry Duel", variant="primary", size="lg")
+            
+            status_text = gr.Textbox(label="Status", interactive=False, lines=2)
         
-        html += f"""
-        <div class="verse-container {poet_class}">
-            <div class="verse-number">{i+1}</div>
-            <p class="verse-line">"{verse['line']}"</p>
-            <div class="verse-meta">
-                <div class="poet-badge">
-                    <span class="poet-icon">{poet_config['icon']}</span>
-                    <span>{verse['poet']}</span>
-                </div>
-                <div class="source-tag">
-                    Source: {verse['source'][:80]}{'...' if len(verse['source']) > 80 else ''}
-                </div>
-            </div>
-        </div>
-        """
-    
-    html += """
-        <div class="poem-footer">
-            ✨ Created by AI Poets · Judged by AI Critic ✨
-        </div>
-    </div>
-    """
-    
-    return html
-
-def display_judgment_details():
-    """Display detailed judgment information"""
-    if not st.session_state.judgments:
-        st.info("No judgments yet. Generate a poem first!")
-        return
-    
-    st.header("⚖️ Detailed Judgments")
-    
-    for i, judgment in enumerate(st.session_state.judgments):
-        with st.expander(f"Verse {i+1} Judgment"):
-            col1, col2 = st.columns(2)
+        with gr.Column(scale=2):
+            gr.Markdown("### 🎭 Duel Information")
+            duel_info = gr.Markdown("")
             
-            with col1:
-                st.subheader("Aurora (Romantic)")
-                st.metric("Total Score", judgment['verse_a_total'])
-                for criterion, score in judgment['verse_a_scores'].items():
-                    st.metric(criterion.replace('_', ' ').title(), score)
-                st.markdown(f"**Analysis:** {judgment['verse_a_reasoning']}")
+            gr.Markdown("### 📜 Final Collaborative Poem")
+            poem_output = gr.Markdown("")
             
-            with col2:
-                st.subheader("Echo (Modernist)")
-                st.metric("Total Score", judgment['verse_b_total'])
-                for criterion, score in judgment['verse_b_scores'].items():
-                    st.metric(criterion.replace('_', ' ').title(), score)
-                st.markdown(f"**Analysis:** {judgment['verse_b_reasoning']}")
+            gr.Markdown("### 📊 Final Statistics")
+            stats_output = gr.Markdown("")
             
-            st.markdown(f"### Winner: {judgment['winner']}")
-            st.markdown(f"**Verdict:** {judgment['final_verdict']}")
-
-
-def display_final_statistics(judge):
-    """Display overall statistics"""
-    stats = judge.get_final_statistics()
+            audio_output = gr.Audio(label="🔊 Listen to the Poem", type="filepath")
     
-    if not stats:
-        return
+    with gr.Row():
+        with gr.Column():
+            gr.Markdown("### 🎯 Round-by-Round Details")
+            rounds_output = gr.Markdown("")
     
-    st.header("Final Statistics")
+    gr.Markdown("""
+    ---
+    ### 📖 About the Poets
     
-    col1, col2, col3, col4 = st.columns(4)
+    Choose from multiple AI poet personas, each with unique styles:
+    - **Aurora (Romantic) 🌹:** Emotion, nature metaphors, flowing rhythm
+    - **Echo (Modernist) ⚡:** Sharp imagery, fragmented thoughts, contemporary language
+    - **Sophocles (Classical) 🏛️:** Formal structure, elevated language, epic themes
+    - **Basho (Haiku) 🍃:** Minimalist, nature-focused, present moment
+    - **Dali (Surrealist) 🎨:** Dream logic, bizarre imagery, subconscious
+    - **Kerouac (Beat) 🎷:** Stream of consciousness, jazz rhythms, raw energy
     
-    with col1:
-        st.metric("Aurora Wins", stats['poet_a_wins'])
-    with col2:
-        st.metric("Echo Wins", stats['poet_b_wins'])
-    with col3:
-        st.metric("Aurora Avg Score", stats['poet_a_avg_score'])
-    with col4:
-        st.metric("Echo Avg Score", stats['poet_b_avg_score'])
-
-
-def display_audio_section():
-    """Display audio generation section"""
-    if not st.session_state.poem_lines:
-        st.info("Generate a poem first to create audio!")
-        return
+    ### 🎯 Judging Criteria
+    - **Factual Grounding** (25%): Connection to document content
+    - **Poetic Quality** (20%): Literary merit and craft
+    - **Coherence** (20%): Flow with previous lines
+    - **Originality** (20%): Fresh perspective
+    - **Emotional Impact** (15%): Ability to evoke feeling
+    """)
     
-    st.header("🎵 Audio Narration (Bonus Feature)")
-    
-    if st.button("Generate Audio"):
-        with st.spinner("Generating audio..."):
-            try:
-                poem_lines = [verse['line'] for verse in st.session_state.poem_lines]
-                poet_names = [verse['poet'] for verse in st.session_state.poem_lines]
-                
-                audio_buffer = AudioGenerator.generate_poem_audio(poem_lines, poet_names)
-                
-                st.audio(audio_buffer, format='audio/mp3')
-                st.success("Audio generated successfully!")
-            except Exception as e:
-                st.error(f"Error generating audio: {str(e)}")
-
+    # Connect button
+    start_btn.click(
+        fn=run_poetry_duel,
+        inputs=[file_input, persona_a, persona_b, num_verses],
+        outputs=[status_text, duel_info, rounds_output, poem_output, stats_output, audio_output]
+    )
 
 if __name__ == "__main__":
-    main()
-
-
-
+    app.launch()

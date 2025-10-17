@@ -1,207 +1,132 @@
-# 🎭 AI Poetry Duel
+# 🎭 Poetry Duel Arena
 
-A sophisticated system where two AI poets with distinct personas compete to create factually-grounded poetry from documents, evaluated by a third AI judge using a multi-dimensional rubric.
+Transform your documents into collaborative poetry through AI competition!
 
-## 🌟 Key Features
+## 🌟 What is Poetry Duel?
 
-- **🤖 Two AI Poets**: Aurora (Romantic) and Echo (Modernist) with unique voices
-- **⚖️ Competitive Generation**: Both poets create each verse, judge selects the best
-- **📚 Factual Grounding**: Every verse must cite its source from the document
-- **🎯 Multi-Criteria Judging**: 5-dimensional evaluation with transparent scoring
-- **🎵 Audio Narration**: Text-to-speech bonus feature
-- **📊 Real-time Statistics**: Track performance and winning streaks
+Poetry Duel Arena is an innovative application where two AI poets with distinct personas compete to create the best verses based on your uploaded document. An AI judge evaluates each round, and the winning verses combine to form a beautiful collaborative poem.
 
-## 🏗️ Project Structure
+## ✨ Features
+
+- 📄 **Multi-format Support**: Upload PDF, DOCX, TXT, or images (with OCR)
+- 🎨 **Distinct Poet Personas**: 
+  - **Aurora** (Romantic): Emotional, nature-inspired, flowing verses
+  - **Echo** (Modernist): Sharp, fragmented, contemporary style
+- 🎯 **AI Judge**: Objective evaluation across 5 criteria
+- 🔊 **Audio Output**: Listen to your generated poem
+- 📊 **Detailed Analytics**: Round-by-round judgments and final statistics
+
+## 🎯 How It Works
+
+1. **Upload** a document (research paper, article, story, etc.)
+2. **Select** two different poet personas
+3. **Choose** the number of verses (6-12)
+4. **Watch** as poets compete and the judge decides
+5. **Enjoy** the final collaborative poem with audio narration
+
+## 📊 Judging Criteria
+
+Each verse is evaluated on:
+- **Factual Grounding** (25%): Connection to document content
+- **Poetic Quality** (20%): Literary merit and craft
+- **Coherence** (20%): Flow with previous lines
+- **Originality** (20%): Fresh perspective and creativity
+- **Emotional Impact** (15%): Ability to evoke feeling
+
+## 🚀 Deployment on HuggingFace
+
+### Setup
+
+1. Create a new Space on HuggingFace
+2. Select "Gradio" as the SDK
+3. Upload all files from the repository
+4. Add your OpenAI API key to the Secrets:
+   - Key: `OPENAI_API_KEY`
+   - Value: Your OpenAI API key
+
+### Project Structure
 
 ```
 poetry-duel/
-├── app.py                          # Main Streamlit application
-├── requirements.txt                # Python dependencies
-├── .env                           # API keys (create this)
-├── README.md                      # This file
+├── app.py                    # Main Gradio application
+├── requirements.txt          # Python dependencies
+├── README.md                # This file
 │
-├── core/                          # Core logic modules
-│   ├── poet.py                   # AI poet with personas
-│   ├── judge.py                  # Evaluation system
-│   ├── document_processor.py     # File parsing (PDF, DOCX, TXT, Images)
-│   └── audio_generator.py        # Text-to-speech
+├── core/                    # Core logic modules
+│   ├── poet.py             # AI poet with personas
+│   ├── judge.py            # Evaluation system
+│   ├── document_processor.py # File parsing
+│   └── audio_generator.py  # Text-to-speech
 │
-├── utils/                         # Utility functions
-│   ├── prompts.py               # AI prompts & templates
-│   └── scoring.py               # Score calculations
+├── utils/                   # Utility functions
+│   ├── prompts.py          # AI prompts
+│   └── scoring.py          # Score calculations
 │
-├── config/                        # Configuration
-│   └── settings.py              # Models, personas, criteria
-│
-└── tests/                         # Test suite
-    └── test_basic.py            # Unit tests
+└── config/                  # Configuration
+    └── settings.py         # Models, personas, criteria
 ```
 
-## 🚀 Quick Start
+## 🔑 API Key Setup
 
-### 1. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+This app requires an OpenAI API key. In HuggingFace Spaces:
 
-### 2. Set Up API Key
-Create a `.env` file in the project root:
-```bash
-OPENAI_API_KEY=sk-proj-your-api-key-here
-```
+1. Go to your Space Settings
+2. Navigate to "Repository secrets"
+3. Add a new secret:
+   - **Name**: `OPENAI_API_KEY`
+   - **Value**: Your OpenAI API key (starts with `sk-`)
 
-Get your API key from: https://platform.openai.com/api-keys
+## 💡 Example Use Cases
 
-### 3. Run the App
-```bash
-streamlit run app.py
-```
+- Turn academic papers into poetic summaries
+- Create artistic interpretations of news articles
+- Generate creative takes on technical documentation
+- Transform historical documents into verse
+- Make poetry from scientific findings
 
-### 4. Use the App
-1. Upload a document (PDF, DOCX, TXT, or Image)
-2. Click "Start Poetry Duel"
-3. Watch the poets compete!
-4. View detailed judgments and statistics
-5. Generate audio narration (optional)
+## 🎨 Poet Personas
 
-## 📦 Requirements
+### Aurora (The Romantic) 🌹
+- **Style**: Emotional depth, nature metaphors, flowing rhythm
+- **Approach**: Seeks beauty and emotional truth in facts
+- **Best for**: Documents with human stories, nature content, emotional themes
 
-- Python 3.8+
-- OpenAI API key with credits
-- Internet connection
+### Echo (The Modernist) ⚡
+- **Style**: Sharp imagery, fragmented structure, contemporary language
+- **Approach**: Finds stark truth and irony in details
+- **Best for**: Technical documents, data-heavy content, modern topics
 
-## 🎨 How It Works
+## 🛠️ Technology Stack
 
-### The Innovation: Competitive Poetry Generation
+- **Frontend**: Gradio
+- **AI Model**: GPT-4 (via OpenAI API)
+- **Text Extraction**: PyPDF2, python-docx, pytesseract
+- **Audio Generation**: gTTS (Google Text-to-Speech)
 
-```
-Document → Extract Text
-           ↓
-    For each verse:
-    ├─ Poet A creates verse
-    ├─ Poet B creates verse
-    ├─ Judge evaluates both
-    └─ Winner's verse added to poem
-           ↓
-    Complete Poem + Statistics
-```
-
-### The Poets
-
-**🌸 Aurora (The Romantic)**
-- Style: Emotion, nature metaphors, flowing rhythm
-- Approach: Seeks beauty in facts
-- Example: *"The ocean whispers secrets in degrees of warmth ascending"*
-
-**⚡ Echo (The Modernist)**  
-- Style: Sharp imagery, fragmented thoughts, contemporary language
-- Approach: Finds stark truth and irony
-- Example: *"Nine-tenths Celsius—the math of melting"*
-
-### The Judge
-
-Evaluates verses on 5 criteria:
-1. **Factual Grounding** (25%) - Connection to document
-2. **Poetic Quality** (20%) - Literary merit
-3. **Coherence** (20%) - Flow with previous lines
-4. **Originality** (20%) - Creative interpretation
-5. **Emotional Impact** (15%) - Resonance
-
-## 💡 Why This Approach?
-
-| Feature | Benefit |
-|---------|---------|
-| **Competitive Selection** | Only best verses make the final poem |
-| **Factual Grounding** | Prevents AI hallucination |
-| **Distinct Personas** | Diverse poetry styles |
-| **Transparent Judging** | Mathematical, explainable decisions |
-| **Real-time Evaluation** | Iterative quality improvement |
-
-## 🎯 Use Cases
-
-- **Educational**: Transform textbooks into memorable poetry
-- **News**: Create poetic summaries of articles
-- **Research**: Make scientific papers more accessible
-- **Creative**: Reimagine any document as art
-- **Business**: Turn reports into engaging narratives
-
-## 🛠️ Configuration
-
-### Change AI Model
-Edit `config/settings.py`:
-```python
-MODEL_NAME = "gpt-4o-mini"  # Cheaper alternative
-```
-
-### Adjust Verses
-In the sidebar, use the slider (6-12 verses)
-
-### Customize Personas
-Edit `config/settings.py` → `POET_PERSONAS`
-
-## 📊 Example Output
-
-**Input**: Climate change report  
-**Output**:
-```
-The ocean whispers secrets in degrees of warmth ascending (Aurora)
-Nine-tenths Celsius—the math of melting (Echo)
-Where coral gardens once bloomed in crystalline embrace (Aurora)
-Now bleached bones, a cemetery of color (Echo)
-...
-```
-
-**Judge Verdict**: Aurora 5 wins, Echo 3 wins
-
-## 🧪 Running Tests
-
-```bash
-python -m pytest tests/ -v
-```
-
-## 🐛 Troubleshooting
-
-### "OpenAI API Key not found"
-- Check `.env` file exists
-- Verify key format: `OPENAI_API_KEY=sk-proj-...`
-- Restart the app
-
-### "Quota Exceeded" Error
-- Check billing: https://platform.openai.com/account/billing
-- Add payment method and credits
-- Use `gpt-4o-mini` for cheaper alternative
-
-### "No text extracted"
-- Check file format (PDF, DOCX, TXT, PNG, JPG)
-- Try a different file
-- Ensure file isn't corrupted or password-protected
-
-## 🔮 Future Enhancements
-
-- [ ] More poet personas (Haiku Master, Beat Poet, Surrealist)
-- [ ] Multi-language support
-- [ ] User voting system
-- [ ] Export to PDF with beautiful formatting
-- [ ] Style transfer (write like Shakespeare, Dickinson, etc.)
-- [ ] Tournament mode (4+ poets, bracket-style)
-
-## 📄 License
+## 📝 License
 
 MIT License - Feel free to use and modify!
 
-## 🙏 Acknowledgments
+## 🤝 Contributing
 
-Built with:
-- **OpenAI GPT-4o** for AI creativity
-- **Streamlit** for the interface
-- **Python** for the logic
+Contributions are welcome! Feel free to:
+- Add new poet personas
+- Improve judging criteria
+- Enhance UI/UX
+- Add new document formats
+- Improve audio generation
 
-## 👨‍💻 Author
+## 🐛 Known Limitations
 
-Created as a demonstration of:
-- Multi-agent AI systems
-- Competitive generation for quality control
-- Transparent AI evaluation frameworks
-- Factual grounding in creative AI
+- OCR quality depends on image clarity
+- API rate limits apply based on your OpenAI plan
+- Audio generation is basic (gTTS) - can be enhanced
+- Processing time increases with document length
+
+## 📧 Support
+
+For issues or questions, please open an issue on the repository.
 
 ---
+
+*Made with ❤️ using AI and poetry*
